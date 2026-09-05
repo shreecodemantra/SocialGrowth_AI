@@ -10,6 +10,12 @@ export default defineConfig({
                 target: process.env.VITE_API_PROXY_TARGET || "http://localhost:8000",
                 changeOrigin: true,
             },
+            // Generated images served by the backend's LocalStorageService fallback
+            // (used whenever S3/R2 isn't configured — see storage_service.py).
+            "/media": {
+                target: process.env.VITE_API_PROXY_TARGET || "http://localhost:8000",
+                changeOrigin: true,
+            },
         },
     },
 });

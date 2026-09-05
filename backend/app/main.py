@@ -1,10 +1,12 @@
 import time
 import uuid
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.router import api_router
 from app.core.config import settings
@@ -79,3 +81,10 @@ async def health_check():
 
 
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
+
+# Serves assets written by LocalStorageService (used whenever S3/R2 creds
+# aren't configured — see app/services/storage_service.py). Harmless to
+# mount unconditionally: the directory is created on first local upload.
+_media_dir = Path(__file__).resolve().parents[1] / "media"
+_media_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/media", StaticFiles(directory=str(_media_dir)), name="media")

@@ -2,13 +2,24 @@
 Object storage (S3 / Cloudflare R2) client used to persist generated
 images/videos/thumbnails (section 7). Business logic never stores binary
 blobs in PostgreSQL — only the resulting `storage_url` is saved on `assets`.
+
+`get_storage_service()` is what the rest of the app should call: it returns
+the real S3/R2-backed client when credentials are configured, and a
+filesystem-backed fallback otherwise, so the content pipeline runs
+end-to-end locally/in tests/in CI without needing real cloud credentials.
 """
 import uuid
+from pathlib import Path
+from typing import Protocol
 
 import boto3
 from botocore.client import Config as BotoConfig
 
 from app.core.config import settings
+
+
+class ObjectStorage(Protocol):
+    def upload_bytes(self, data: bytes, *, content_type: str, key_prefix: str = "assets") -> str: ...
 
 
 class StorageService:
@@ -33,3 +44,31 @@ class StorageService:
         key = f"{key_prefix}/{uuid.uuid4()}.{extension}"
         self._client.put_object(Bucket=self._bucket, Key=key, Body=data, ContentType=content_type)
         return self._public_url(key)
+
+
+class LocalStorageService:
+    """
+    Filesystem-backed fallback used when S3/R2 credentials aren't configured
+    (local development, CI, tests). Writes under `backend/media/` and serves
+    it via the `/media` static mount registered in `app/main.py`. Switch to
+    real object storage in production by setting S3_ENDPOINT_URL /
+    S3_ACCESS_KEY_ID / S3_SECRET_ACCESS_KEY in `.env`.
+    """
+
+    def __init__(self, base_dir: Path | None = None):
+        self._base_dir = base_dir or (Path(__file__).resolve().parents[2] / "media")
+        self._base_dir.mkdir(parents=True, exist_ok=True)
+
+    def upload_bytes(self, data: bytes, *, content_type: str, key_prefix: str = "assets") -> str:
+        extension = content_type.split("/")[-1] if "/" in content_type else "bin"
+        key = f"{key_prefix}/{uuid.uuid4()}.{extension}"
+        path = self._base_dir / key
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+        return f"/media/{key}"
+
+
+def get_storage_service() -> ObjectStorage:
+    if settings.S3_ENDPOINT_URL and settings.S3_ACCESS_KEY_ID and settings.S3_SECRET_ACCESS_KEY:
+        return StorageService()
+    return LocalStorageService()

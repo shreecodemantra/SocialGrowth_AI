@@ -36,27 +36,58 @@ phase lands.
   rejection, wrong-password rejection, `/users/me` auth guard, workspace
   creation + brand profile upsert, cross-workspace permission denial
 
-## ⬜ Phase 2 — AI Content
+## ✅ Phase 2 — AI Content (done)
 
-- `campaigns`, `content_ideas`, `ai_generations`, `assets`, `posts`,
-  `post_platforms` tables
-- Real LLM adapter (OpenAI or Anthropic) behind `app/ai/providers/`
-- Content agents (research → per-platform strategy → SEO → quality) per
-  section 6, returning structured JSON
-- Content Generator UI (section 37) wired to `/api/v1/content/generate`
-- Content approval workflow (GENERATED → PENDING_REVIEW → APPROVED)
+- Tables: `campaigns`, `posts`, `post_platforms`, `assets`, `post_status_history`, `ai_generations`
+- Agent pipeline (`app/agents/`), each a plain async function taking
+  structured input and returning structured JSON — no DB/HTTP calls inside
+  an agent itself:
+  - `research_agent` — grounds the pipeline with a brief before any platform writing starts
+  - `content_agent` — dedicated prompt + schema per platform (Instagram/LinkedIn/Facebook/YouTube
+    never share content — see `app/schemas/content.py`)
+  - `seo_agent` — merges brand-preferred hashtags, dedupes, caps per-platform counts
+  - `quality_agent` — flags forbidden-word violations for the reviewer (never silently blocks)
+  - `image_agent` — resolves per-platform creative dimensions, builds the prompt, calls `ImageProvider`
+  - All four fall back to a deterministic, still-useful default when the configured LLM
+    doesn't return parseable JSON — true today for `LLM_PROVIDER=mock` (the default), so the
+    whole pipeline runs end-to-end with zero AI keys configured. Swap in a real `LLMProvider`
+    (OpenAI/Anthropic/Gemini text) any time — no other code changes.
+- `CampaignService` orchestrates: create campaign → research once → per
+  platform generate+SEO+quality(+image, +video if requested for
+  Instagram/YouTube) → `PENDING_REVIEW`. Failures leave the campaign/post
+  rows marked `FAILED` with a reason rather than disappearing.
+- Approval workflow: approve/reject per platform, edit content (re-runs SEO
+  + quality, resets to `PENDING_REVIEW` even if previously approved),
+  regenerate a single platform. Post-level status flips to `APPROVED` once
+  every platform is.
+- `LocalStorageService` fallback (`app/services/storage_service.py`,
+  served at `/media`) so generated images work without real S3/R2
+  credentials — used automatically whenever they're unset; same interface
+  as the real `StorageService`, swap is transparent to callers.
+- Content Generator UI (section 37): topic + goal + platform picker +
+  image/video toggles → generates → per-platform review cards (image,
+  every field, hashtags as chips, quality-violation banner,
+  Edit/Regenerate/Approve/Reject). Campaigns list + detail pages reuse the
+  same review card.
+- 19 new backend tests (25/25 total): agent-level unit tests (fallback
+  behavior, hashtag merging/capping, forbidden-word detection) +
+  full-pipeline API tests (generation, brand-profile-required guard,
+  approval/rejection/edit/regenerate, cross-workspace permission denial)
 
 ## ⬜ Phase 3 — Social Integration
 
 - Instagram/Facebook/LinkedIn/YouTube OAuth + `SocialPublisher` adapters
 - `social_accounts`, `oauth_tokens` tables (encrypted token storage)
 - Social Accounts settings page
+- Actually publishing an approved post is still not possible until this phase lands
 
 ## ⬜ Phase 4 — Scheduler
 
-- `scheduled_jobs`, `post_status_history` tables
+- `scheduled_jobs` table
 - Celery Beat periodic tasks: publish due posts, retry with backoff
 - Content Calendar UI (drag-and-drop)
+- Move campaign generation (and especially video generation, which can take
+  minutes) off the request/response cycle and onto a Celery task
 
 ## ⬜ Phase 5 — Analytics
 

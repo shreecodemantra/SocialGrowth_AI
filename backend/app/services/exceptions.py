@@ -29,3 +29,18 @@ class InvalidCredentialsError(DomainError):
 class PermissionDeniedError(DomainError):
     code = "PERMISSION_DENIED"
     status_code = 403
+
+
+class ValidationFailedError(DomainError):
+    code = "VALIDATION_FAILED"
+    status_code = 422
+
+
+class GenerationFailedError(DomainError):
+    """Raised when the AI content/image pipeline fails partway through. The
+    partially-created Campaign/Post rows are kept (marked FAILED) so the
+    caller can see what happened rather than losing the attempt."""
+
+    code = "GENERATION_FAILED"
+    status_code = 502
+    retryable = True

@@ -3,6 +3,9 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { ComingSoon } from "./components/ComingSoon";
 import { Layout } from "./components/Layout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { CampaignDetail } from "./pages/Campaigns/CampaignDetail";
+import { Campaigns } from "./pages/Campaigns/Campaigns";
+import { ContentGenerator } from "./pages/ContentGenerator/ContentGenerator";
 import { Dashboard } from "./pages/Dashboard/Dashboard";
 import { Login } from "./pages/Login/Login";
 import { Register } from "./pages/Login/Register";
@@ -24,13 +27,11 @@ export default function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/brand-settings" element={<BrandSettings />} />
 
-        <Route path="/campaigns" element={<ComingSoon title="Campaigns" phase="Phase 2" />} />
-        <Route
-          path="/content-generator"
-          element={<ComingSoon title="Content Generator" phase="Phase 2" />}
-        />
+        <Route path="/campaigns" element={<Campaigns />} />
+        <Route path="/campaigns/:campaignId" element={<CampaignDetail />} />
+        <Route path="/content-generator" element={<ContentGenerator />} />
         <Route path="/calendar" element={<ComingSoon title="Content Calendar" phase="Phase 4" />} />
-        <Route path="/posts" element={<ComingSoon title="Posts" phase="Phase 2–4" />} />
+        <Route path="/posts" element={<ComingSoon title="Posts" phase="Phase 4" />} />
         <Route path="/analytics" element={<ComingSoon title="Analytics" phase="Phase 5" />} />
         <Route path="/insights" element={<ComingSoon title="AI Insights" phase="Phase 6" />} />
         <Route

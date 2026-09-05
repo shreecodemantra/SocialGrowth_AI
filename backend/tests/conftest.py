@@ -15,6 +15,7 @@ from sqlalchemy.pool import StaticPool
 from app.db.base_all import Base
 from app.db.session import get_db
 from app.main import app
+from app.services.storage_service import LocalStorageService, get_storage_service
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
@@ -33,11 +34,17 @@ async def db_session():
 
 
 @pytest_asyncio.fixture
-async def client(db_session):
+async def client(db_session, tmp_path):
     async def _get_db_override():
         yield db_session
 
+    # Route generated assets to a throwaway directory instead of the real
+    # backend/media/, and instead of requiring real S3/R2 credentials.
+    def _get_storage_override():
+        return LocalStorageService(base_dir=tmp_path / "media")
+
     app.dependency_overrides[get_db] = _get_db_override
+    app.dependency_overrides[get_storage_service] = _get_storage_override
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac

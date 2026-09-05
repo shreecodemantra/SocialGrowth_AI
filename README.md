@@ -142,11 +142,17 @@ Open http://localhost:5173. The dev server proxies `/api` to
    (native) — and register an account at `/register`.
 2. You're redirected to `/dashboard`; create a workspace (e.g. "Shree Code
    Mantra").
-3. Open **Brand Settings** and fill in the brand profile — this is what the
-   Phase 2 content pipeline will read when generating platform-specific
-   content.
-4. Every other sidebar link shows a "coming in Phase N" placeholder until
-   that phase lands.
+3. Open **Brand Settings** and fill in the brand profile — the content
+   pipeline reads this every time it generates or scores content, and
+   generation is blocked with a clear error until it's set up.
+4. Open **Content Generator**, enter a topic (e.g. "Transforming Students
+   into Industry-Ready Developers"), pick platforms, and generate. Review
+   each platform's content, edit/regenerate/approve/reject per platform.
+   Generated campaigns/posts are listed under **Campaigns**.
+5. Everything else in the sidebar (Calendar, Posts, Analytics, Insights,
+   Recommendations, Social Accounts, Team, Settings) shows a "coming in
+   Phase N" placeholder until that phase lands — there's no way to actually
+   *publish* an approved post yet (see `PROGRESS.md`, Phase 3).
 
 ## Using Gemini for image & reel generation
 
