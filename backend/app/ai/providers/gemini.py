@@ -56,7 +56,7 @@ class GeminiImageProvider(ImageProvider):
 
         if self.model.startswith("imagen-"):
             return await self._generate_imagen(client, prompt, width, height)
-        return await self._generate_native(client, prompt)
+        return await self._generate_native(client, prompt, width, height)
 
     async def _generate_imagen(
         self, client: genai.Client, prompt: str, width: int, height: int
@@ -79,20 +79,34 @@ class GeminiImageProvider(ImageProvider):
             raw={"model": self.model, "prompt": prompt},
         )
 
-    async def _generate_native(self, client: genai.Client, prompt: str) -> ImageResult:
+    async def _generate_native(
+        self, client: genai.Client, prompt: str, width: int = 1024, height: int = 1024
+    ) -> ImageResult:
+        # Embed the target dimensions in the prompt — the native generate_content
+        # endpoint does not accept explicit size parameters (unlike Imagen).
+        sized_prompt = f"{prompt}\n\nOutput image dimensions: {width}x{height} pixels."
         response = await client.aio.models.generate_content(
             model=self.model,
-            contents=prompt,
-            config=types.GenerateContentConfig(response_modalities=["IMAGE"]),
+            contents=sized_prompt,
+            config=types.GenerateContentConfig(response_modalities=["IMAGE", "TEXT"]),
         )
-        for part in response.parts or []:
-            if part.inline_data and part.inline_data.data:
-                return ImageResult(
-                    image_bytes=part.inline_data.data,
-                    content_type=part.inline_data.mime_type or "image/png",
-                    raw={"model": self.model, "prompt": prompt},
-                )
-        raise RuntimeError("Gemini returned no image data — the prompt may have been filtered.")
+        # Walk candidates safely; the top-level `.parts` shortcut can be None
+        # when the model returns only an image part inside a candidate.
+        candidates = response.candidates or []
+        for candidate in candidates:
+            parts = (candidate.content.parts or []) if candidate.content else []
+            for part in parts:
+                if part.inline_data and part.inline_data.data:
+                    return ImageResult(
+                        image_bytes=part.inline_data.data,
+                        content_type=part.inline_data.mime_type or "image/png",
+                        raw={"model": self.model, "prompt": sized_prompt},
+                    )
+        raise RuntimeError(
+            f"Gemini ({self.model}) returned no image data — "
+            "the prompt may have been filtered or the model does not support image output. "
+            f"finish_reason={[c.finish_reason for c in candidates]}"
+        )
 
 
 class GeminiVideoProvider(VideoProvider):

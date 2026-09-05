@@ -71,6 +71,13 @@ class CampaignService:
     async def list_posts(self, workspace_id: uuid.UUID) -> list[Post]:
         return await self.posts.list_for_workspace(workspace_id)
 
+    async def delete_campaign(self, workspace_id: uuid.UUID, campaign_id: uuid.UUID) -> None:
+        campaign = await self.campaigns.get_by_id(campaign_id)
+        if not campaign or campaign.workspace_id != workspace_id:
+            raise NotFoundError("Campaign not found.")
+        await self.campaigns.delete(campaign)
+        await self.session.commit()
+
     # ---- generation -------------------------------------------------------
 
     async def create_and_generate(
@@ -141,11 +148,16 @@ class CampaignService:
             await self.session.commit()
 
         except Exception as exc:  # noqa: BLE001 — deliberately broad: any agent/provider failure lands here
-            logger.error("campaign_generation_failed", campaign_id=str(campaign.id), error=str(exc))
+            # Capture PKs NOW — rollback() expires the ORM objects and accessing
+            # .id afterwards triggers a sync lazy-load inside an async greenlet
+            # (MissingGreenlet).  Local variables are immune to session expiry.
+            failed_campaign_id = campaign.id
+            failed_post_id = post.id
+            logger.error("campaign_generation_failed", campaign_id=str(failed_campaign_id), error=str(exc))
             await self.session.rollback()
             # Re-fetch in a fresh transaction so we can persist the failure state cleanly.
-            campaign = await self.campaigns.get_by_id(campaign.id)
-            post = await self.posts.get_by_id(post.id)
+            campaign = await self.campaigns.get_by_id(failed_campaign_id)
+            post = await self.posts.get_by_id(failed_post_id)
             campaign.status = CampaignStatus.FAILED
             campaign.failure_reason = str(exc)[:1000]
             post.status = PostStatus.FAILED

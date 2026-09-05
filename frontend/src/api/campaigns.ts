@@ -18,3 +18,7 @@ export async function createCampaign(
   const { data } = await apiClient.post<CampaignDetail>(`/workspaces/${workspaceId}/campaigns`, request);
   return data;
 }
+
+export async function deleteCampaign(workspaceId: string, campaignId: string): Promise<void> {
+  await apiClient.delete(`/workspaces/${workspaceId}/campaigns/${campaignId}`);
+}

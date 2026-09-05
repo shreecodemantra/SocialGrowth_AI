@@ -90,3 +90,17 @@ async def get_campaign(
         return await service.get_campaign_with_posts(workspace_id, campaign_id)
     except DomainError as exc:
         _raise_domain_error(exc)
+
+
+@router.delete("/{campaign_id}", status_code=204)
+async def delete_campaign(
+    workspace_id: uuid.UUID,
+    campaign_id: uuid.UUID,
+    _membership: WorkspaceMember = Depends(require_editor),
+    db: AsyncSession = Depends(get_db),
+):
+    service = CampaignService(db)
+    try:
+        await service.delete_campaign(workspace_id, campaign_id)
+    except DomainError as exc:
+        _raise_domain_error(exc)
